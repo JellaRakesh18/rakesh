@@ -23,7 +23,7 @@ function getClient() {
 }
 
 function getCandidateModels() {
-  return [...new Set([env.geminiModel, 'gemini-3.7-flash', 'gemini-3.5-flash-lite'].filter(Boolean))];
+  return [...new Set([env.geminiModel, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'].filter(Boolean))];
 }
 
 function isTransientOrModelError(err) {
@@ -50,20 +50,19 @@ async function callWithRetryAndFallback(ai, buildParams) {
 
   for (let i = 0; i < models.length; i += 1) {
     const model = models[i];
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        return await ai.models.generateContent(buildParams(model));
-      } catch (err) {
-        lastErr = err;
-        if (!isTransientOrModelError(err)) {
-          throw err;
-        }
-        if (attempt === 0) {
-          await sleep(1000);
-        }
+    try {
+      return await ai.models.generateContent(buildParams(model));
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientOrModelError(err)) {
+        throw err;
+      }
+      // Brief pause only on rate-limit before switching to next fallback model
+      if (err?.status === 429) {
+        await sleep(500);
       }
     }
-    console.warn(`[gemini] Model "${model}" unavailable (${lastErr?.message?.slice(0, 120)}); trying fallback...`);
+    console.warn(`[gemini] Model "${model}" unavailable (${lastErr?.message?.slice(0, 120)}); switching to fallback...`);
   }
 
   throw lastErr;

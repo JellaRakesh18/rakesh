@@ -2,7 +2,7 @@ import api, { API_BASE_URL } from './api';
 
 export const researchService = {
   async generatePlan(payload) {
-    const { data } = await api.post('/research/plan', payload);
+    const { data } = await api.post('/research/plan', payload, { timeout: 120000 });
     return data.session;
   },
 

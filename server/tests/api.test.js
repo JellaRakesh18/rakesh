@@ -126,10 +126,34 @@ test('Integration: Auth, RBAC, Documents, Research & Health APIs', async (t) => 
   });
   assert.equal(loginRes.status, 200);
   assert.ok(loginRes.body.token);
+  assert.ok(loginRes.body.accessToken);
+  assert.ok(loginRes.body.refreshToken);
+
+  // Refresh token cannot be used directly as Bearer token
+  const refreshAsBearer = await request(app)
+    .get('/api/auth/me')
+    .set('Authorization', `Bearer ${loginRes.body.refreshToken}`);
+  assert.equal(refreshAsBearer.status, 401);
+
+  // Refresh endpoint issues new access + refresh tokens
+  const refreshRes = await request(app)
+    .post('/api/auth/refresh')
+    .send({ refreshToken: loginRes.body.refreshToken });
+  assert.equal(refreshRes.status, 200);
+  assert.ok(refreshRes.body.accessToken);
+  assert.ok(refreshRes.body.refreshToken);
+
+  const invalidRefresh = await request(app)
+    .post('/api/auth/refresh')
+    .send({ refreshToken: 'invalid.refresh.token' });
+  assert.equal(invalidRefresh.status, 401);
+
+  const logoutRes = await request(app).post('/api/auth/logout');
+  assert.equal(logoutRes.status, 200);
 
   const meRes = await request(app)
     .get('/api/auth/me')
-    .set('Authorization', `Bearer ${userToken}`);
+    .set('Authorization', `Bearer ${refreshRes.body.accessToken}`);
   assert.equal(meRes.status, 200);
   assert.equal(meRes.body.user.email, 'user@researchx.ai');
 

@@ -17,7 +17,8 @@ export const env = {
     (process.env.NODE_ENV === 'production'
       ? ''
       : 'dev_only_insecure_jwt_secret_change_in_env'),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '90d',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   tavilyApiKey: process.env.TAVILY_API_KEY || '',

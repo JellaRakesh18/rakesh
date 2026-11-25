@@ -18,6 +18,10 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(10, 'Refresh token is required'),
+});
+
 export const updateProfileSchema = z.object({
   name: z
     .string()

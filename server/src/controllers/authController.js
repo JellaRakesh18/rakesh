@@ -6,19 +6,44 @@ import { AppError } from '../middleware/errorMiddleware.js';
 import {
   registerSchema,
   loginSchema,
+  refreshSchema,
   updateProfileSchema,
 } from '../validators/authValidators.js';
 
-function signToken(user) {
+function signAccessToken(user) {
   return jwt.sign(
     {
       sub: user._id.toString(),
       email: user.email,
       role: user.role,
+      type: 'access',
     },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn }
   );
+}
+
+function signRefreshToken(user) {
+  return jwt.sign(
+    {
+      sub: user._id.toString(),
+      type: 'refresh',
+      tokenVersion: user.tokenVersion || 0,
+    },
+    env.jwtSecret,
+    { expiresIn: env.jwtRefreshExpiresIn }
+  );
+}
+
+function buildAuthPayload(user) {
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
+  return {
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    user: user.toJSON(),
+  };
 }
 
 export async function register(req, res, next) {
@@ -31,10 +56,6 @@ export async function register(req, res, next) {
 
     const passwordHash = await bcrypt.hash(data.password, 12);
     const userCount = await User.countDocuments();
-    // First registered user can optionally be promoted or stay standard; keep role 'user' by default
-    // unless explicitly promoted in DB. Let's make first user 'admin' ONLY if env.nodeEnv !== 'production'
-    // or keep role strictly 'user' and let a seed/script promote admins. Wait: having first user or demo admin
-    // is handy, let's keep standard registration strictly 'user' for security!
     const user = await User.create({
       name: data.name,
       email: data.email,
@@ -42,11 +63,7 @@ export async function register(req, res, next) {
       role: userCount === 0 ? 'admin' : 'user',
     });
 
-    const token = signToken(user);
-    return res.status(201).json({
-      token,
-      user: user.toJSON(),
-    });
+    return res.status(201).json(buildAuthPayload(user));
   } catch (err) {
     next(err);
   }
@@ -65,14 +82,48 @@ export async function login(req, res, next) {
       throw new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
     }
 
-    const token = signToken(user);
-    return res.json({
-      token,
-      user: user.toJSON(),
-    });
+    return res.json(buildAuthPayload(user));
   } catch (err) {
     next(err);
   }
+}
+
+export async function refreshSession(req, res, next) {
+  try {
+    const { refreshToken } = refreshSchema.parse(req.body);
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, env.jwtSecret);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        throw new AppError('Refresh token expired. Please sign in again.', 401, 'REFRESH_EXPIRED');
+      }
+      throw new AppError('Invalid refresh token.', 401, 'INVALID_REFRESH_TOKEN');
+    }
+
+    if (decoded.type !== 'refresh' || !decoded.sub) {
+      throw new AppError('Invalid refresh token type.', 401, 'INVALID_REFRESH_TOKEN');
+    }
+
+    const user = await User.findById(decoded.sub);
+    if (!user) {
+      throw new AppError('User account no longer exists.', 401, 'USER_NOT_FOUND');
+    }
+
+    if ((user.tokenVersion || 0) !== (decoded.tokenVersion || 0)) {
+      throw new AppError('Refresh token has been revoked.', 401, 'REFRESH_REVOKED');
+    }
+
+    // Issue fresh access token and sliding 90-day refresh token
+    return res.json(buildAuthPayload(user));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function logoutSession(_req, res) {
+  return res.json({ message: 'Signed out successfully.' });
 }
 
 export async function getMe(req, res) {

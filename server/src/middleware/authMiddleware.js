@@ -15,21 +15,40 @@ export async function requireAuth(req, res, next) {
     }
 
     if (!token) {
-      return res.status(401).json({ error: 'Authentication required. Please log in.' });
+      return res.status(401).json({
+        error: 'Authentication required. Please log in.',
+        code: 'AUTH_REQUIRED',
+      });
     }
 
     const decoded = jwt.verify(token, env.jwtSecret);
+    if (decoded.type === 'refresh') {
+      return res.status(401).json({
+        error: 'Refresh token cannot be used directly for API access.',
+        code: 'INVALID_TOKEN_TYPE',
+      });
+    }
+
     const user = await User.findById(decoded.sub).select('-passwordHash');
     if (!user) {
-      return res.status(401).json({ error: 'User account no longer exists.' });
+      return res.status(401).json({
+        error: 'User account no longer exists.',
+        code: 'USER_NOT_FOUND',
+      });
     }
 
     req.user = user;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Session expired. Please log in again.' });
+      return res.status(401).json({
+        error: 'Session expired. Refreshing authentication...',
+        code: 'TOKEN_EXPIRED',
+      });
     }
-    return res.status(401).json({ error: 'Invalid authentication token.' });
+    return res.status(401).json({
+      error: 'Invalid authentication token.',
+      code: 'INVALID_TOKEN',
+    });
   }
 }
