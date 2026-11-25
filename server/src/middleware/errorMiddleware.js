@@ -9,6 +9,12 @@ export class AppError extends Error {
   }
 }
 
+export function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
 export function notFoundHandler(req, res) {
   res.status(404).json({
     error: `Route not found: ${req.method} ${req.originalUrl}`,

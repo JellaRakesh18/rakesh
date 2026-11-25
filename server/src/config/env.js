@@ -11,7 +11,7 @@ export const env = {
   port: toInt(process.env.PORT, 5000),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProd: process.env.NODE_ENV === 'production',
-  mongodbUri: process.env.MONGODB_URI || '',
+  mongodbUri: (process.env.MONGODB_URI || process.env.MONGO_URI || '').trim(),
   jwtSecret:
     process.env.JWT_SECRET ||
     (process.env.NODE_ENV === 'production'
@@ -33,14 +33,28 @@ export const env = {
   useInMemoryDb: process.env.USE_IN_MEMORY_DB === 'true',
 };
 
-export const isGeminiConfigured = () => Boolean(env.geminiApiKey && env.geminiApiKey.trim() && !env.geminiApiKey.includes('your_gemini'));
-export const isTavilyConfigured = () => Boolean(env.tavilyApiKey && env.tavilyApiKey.trim() && !env.tavilyApiKey.includes('your_tavily'));
+export const isGeminiConfigured = () =>
+  Boolean(env.geminiApiKey && env.geminiApiKey.trim() && !env.geminiApiKey.includes('your_gemini'));
+
+export const isTavilyConfigured = () =>
+  Boolean(env.tavilyApiKey && env.tavilyApiKey.trim() && !env.tavilyApiKey.includes('your_tavily'));
 
 export function validateStartupConfig() {
   if (env.isProd && !env.jwtSecret) {
     throw new Error('JWT_SECRET must be set in production.');
   }
   if (!env.mongodbUri && !env.useInMemoryDb) {
-    console.warn('[config] MONGODB_URI is not set. Set MONGODB_URI or USE_IN_MEMORY_DB=true for local testing.');
+    console.warn(
+      '[config] MONGODB_URI / MONGO_URI is not set. Set MONGODB_URI or USE_IN_MEMORY_DB=true for local development.'
+    );
+  }
+  if (!isGeminiConfigured()) {
+    console.warn('[config] GEMINI_API_KEY is missing or placeholder; AI research endpoints will return 503 until configured.');
+  }
+  if (!isTavilyConfigured()) {
+    console.warn('[config] TAVILY_API_KEY is missing or placeholder; live webSearch tool calls will return configuration errors until configured.');
+  }
+  if (!env.clientUrl) {
+    console.warn('[config] CLIENT_URL is empty; defaulting CORS to localhost in development.');
   }
 }

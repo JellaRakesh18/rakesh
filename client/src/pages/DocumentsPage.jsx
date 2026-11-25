@@ -35,9 +35,9 @@ export function DocumentsPage() {
     setError('');
     try {
       const list = await documentService.list();
-      setDocuments(list);
+      setDocuments(Array.isArray(list) ? list : []);
     } catch (err) {
-      setError(err.friendlyMessage || 'Failed to load documents.');
+      setError(err?.friendlyMessage || 'Failed to load documents.');
     } finally {
       setLoading(false);
     }

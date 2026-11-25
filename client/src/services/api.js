@@ -14,7 +14,28 @@ const api = axios.create({
   timeout: 65000,
 });
 
+const MAX_TRANSIENT_RETRIES = 2;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 let refreshPromise = null;
+
+function isTransientRetryable(error) {
+  const config = error?.config;
+  if (!config || config.retry === false) return false;
+
+  const method = (config.method || 'get').toLowerCase();
+  const url = config.url || '';
+  const isSafeMethod = method === 'get' || method === 'head' || method === 'options';
+  const isSafeAuthRetry = url.includes('/auth/me') || url.includes('/auth/refresh');
+
+  if (!isSafeMethod && !isSafeAuthRetry) return false;
+
+  const status = error.response?.status;
+  const isNetworkFailure = !error.response;
+  const isTransientServer = status === 502 || status === 503 || status === 504;
+
+  return isNetworkFailure || isTransientServer;
+}
 
 export async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
@@ -72,6 +93,7 @@ api.interceptors.response.use(
       url.includes('/auth/refresh') ||
       url.includes('/auth/logout');
 
+    // 1. Automatic 401 silent refresh + retry
     if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       try {
@@ -88,6 +110,16 @@ api.interceptors.response.use(
           'Your session could not be renewed. Please sign in again.';
         refreshErr.friendlyMessage = message;
         return Promise.reject(refreshErr);
+      }
+    }
+
+    // 2. Automatic transient network / 5xx gateway retry (up to 2 retries)
+    if (isTransientRetryable(error)) {
+      const retryCount = originalRequest._transientRetries || 0;
+      if (retryCount < MAX_TRANSIENT_RETRIES) {
+        originalRequest._transientRetries = retryCount + 1;
+        await sleep(800 * (retryCount + 1));
+        return api(originalRequest);
       }
     }
 

@@ -57,10 +57,18 @@ export function AdminPage() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Active Researchers', value: `${data.stats.activeUsers} / ${data.stats.totalUsers}`, icon: Users },
-                { label: 'Research Sessions', value: `${data.stats.completedSessions} / ${data.stats.totalSessions}`, icon: BookOpen },
-                { label: 'Total Tool Calls', value: data.stats.totalToolCalls, icon: Activity },
-                { label: 'Failed Tool Calls', value: data.stats.failedToolCalls, icon: AlertTriangle },
+                {
+                  label: 'Active Researchers',
+                  value: `${data?.stats?.activeUsers ?? 0} / ${data?.stats?.totalUsers ?? 0}`,
+                  icon: Users,
+                },
+                {
+                  label: 'Research Sessions',
+                  value: `${data?.stats?.completedSessions ?? 0} / ${data?.stats?.totalSessions ?? 0}`,
+                  icon: BookOpen,
+                },
+                { label: 'Total Tool Calls', value: data?.stats?.totalToolCalls ?? 0, icon: Activity },
+                { label: 'Failed Tool Calls', value: data?.stats?.failedToolCalls ?? 0, icon: AlertTriangle },
               ].map((card) => {
                 const Icon = card.icon;
                 return (

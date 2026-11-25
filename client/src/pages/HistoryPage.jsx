@@ -38,9 +38,9 @@ export function HistoryPage() {
         search: search.trim() || undefined,
         status: statusFilter,
       });
-      setSessions(data.sessions || []);
+      setSessions(Array.isArray(data?.sessions) ? data.sessions : []);
     } catch (err) {
-      setError(err.friendlyMessage || 'Failed to load research history.');
+      setError(err?.friendlyMessage || 'Failed to load research history.');
     } finally {
       setLoading(false);
     }

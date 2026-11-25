@@ -85,11 +85,23 @@ test('Integration: Auth, RBAC, Documents, Research & Health APIs', async (t) => 
     if (mongod) await mongod.stop();
   });
 
-  // 1. Health check
+  // 1. Health check & CORS origin handling
   const healthRes = await request(app).get('/api/health');
   assert.equal(healthRes.status, 200);
   assert.equal(healthRes.body.status, 'ok');
   assert.equal(healthRes.body.database, 'connected');
+
+  const allowedCors = await request(app)
+    .options('/api/health')
+    .set('Origin', 'http://localhost:5173');
+  assert.equal(allowedCors.status, 204);
+  assert.equal(allowedCors.headers['access-control-allow-origin'], 'http://localhost:5173');
+
+  const blockedCors = await request(app)
+    .get('/api/health')
+    .set('Origin', 'https://malicious.example.com');
+  assert.equal(blockedCors.status, 403);
+  assert.equal(blockedCors.body.code, 'CORS_FORBIDDEN');
 
   // 2. Register first user (gets admin role) and second user (gets user role)
   const reg1 = await request(app).post('/api/auth/register').send({

@@ -2,21 +2,37 @@ import { env, validateStartupConfig } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/db.js';
 import { createApp } from './app.js';
 
+let httpServer = null;
+
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('[process] Unhandled Promise Rejection:', msg);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[process] Uncaught Exception:', err.message);
+});
+
 async function start() {
   validateStartupConfig();
   await connectDatabase();
 
   const app = createApp();
-  const server = app.listen(env.port, () => {
+  httpServer = app.listen(env.port, () => {
     console.log(`[server] RESEARCHX AI listening on port ${env.port} (${env.nodeEnv})`);
   });
 
   const shutdown = async (signal) => {
     console.log(`[server] ${signal} received. Shutting down gracefully...`);
-    server.close(async () => {
+    if (httpServer) {
+      httpServer.close(async () => {
+        await disconnectDatabase();
+        process.exit(0);
+      });
+    } else {
       await disconnectDatabase();
       process.exit(0);
-    });
+    }
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));

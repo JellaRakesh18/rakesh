@@ -239,10 +239,10 @@ export function ReportViewer({ report }) {
                     <td className="py-3 pr-4 whitespace-nowrap">
                       <span
                         className={`px-2.5 py-0.5 rounded-full border text-[11px] font-medium uppercase ${
-                          SUPPORT_BADGE[row.supportLevel] || SUPPORT_BADGE.partially_supported
+                          SUPPORT_BADGE[row?.supportLevel] || SUPPORT_BADGE.partially_supported
                         }`}
                       >
-                        {row.supportLevel.replace('_', ' ')}
+                        {(row?.supportLevel || 'partially_supported').replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="py-3 whitespace-nowrap">

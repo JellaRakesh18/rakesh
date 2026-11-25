@@ -2,9 +2,30 @@ import mongoose from 'mongoose';
 import { env } from './env.js';
 
 let memoryServer = null;
+let listenersAttached = false;
 
-export async function connectDatabase() {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function attachConnectionListeners() {
+  if (listenersAttached) return;
+  listenersAttached = true;
+
+  mongoose.connection.on('error', (err) => {
+    console.error('[db] MongoDB runtime error:', err.message);
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    console.warn('[db] MongoDB disconnected.');
+  });
+
+  mongoose.connection.on('reconnected', () => {
+    console.log('[db] MongoDB reconnected.');
+  });
+}
+
+export async function connectDatabase({ maxRetries = 3 } = {}) {
   mongoose.set('strictQuery', true);
+  attachConnectionListeners();
 
   let uri = env.mongodbUri;
 
@@ -19,12 +40,24 @@ export async function connectDatabase() {
     throw new Error('MONGODB_URI is required to connect to MongoDB.');
   }
 
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 10000,
-  });
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+    try {
+      await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 10000,
+      });
+      console.log('[db] MongoDB connection established');
+      return mongoose.connection;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[db] Connection attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        await sleep(1500 * attempt);
+      }
+    }
+  }
 
-  console.log('[db] MongoDB connection established');
-  return mongoose.connection;
+  throw lastError;
 }
 
 export async function disconnectDatabase() {

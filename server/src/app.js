@@ -3,12 +3,16 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { env } from './config/env.js';
 import { apiRateLimiter } from './middleware/rateLimitMiddleware.js';
-import { notFoundHandler, errorHandler } from './middleware/errorMiddleware.js';
+import { AppError, notFoundHandler, errorHandler } from './middleware/errorMiddleware.js';
 import authRoutes from './routes/authRoutes.js';
 import researchRoutes from './routes/researchRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
+
+function normalizeOrigin(url) {
+  return String(url || '').trim().replace(/\/+$/, '');
+}
 
 export function createApp() {
   const app = express();
@@ -18,17 +22,23 @@ export function createApp() {
 
   const allowedOrigins = env.clientUrl
     .split(',')
-    .map((s) => s.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 
   app.use(
     cors({
       origin(origin, callback) {
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin) || (!env.isProd && origin.startsWith('http://localhost:'))) {
+        const cleanOrigin = normalizeOrigin(origin);
+        if (
+          allowedOrigins.includes(cleanOrigin) ||
+          (!env.isProd &&
+            (cleanOrigin.startsWith('http://localhost:') ||
+              cleanOrigin.startsWith('http://127.0.0.1:')))
+        ) {
           return callback(null, true);
         }
-        return callback(new Error(`CORS blocked origin: ${origin}`));
+        return callback(new AppError(`CORS blocked origin: ${cleanOrigin}`, 403, 'CORS_FORBIDDEN'));
       },
       credentials: true,
     })

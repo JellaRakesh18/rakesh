@@ -110,23 +110,36 @@ export function ResearchWorkspacePage() {
       const es = new EventSource(url);
       eventSourceRef.current = es;
 
+      const parseSseData = (e) => {
+        try {
+          return e?.data ? JSON.parse(e.data) : null;
+        } catch {
+          return null;
+        }
+      };
+
       es.addEventListener('snapshot', (e) => {
-        const data = JSON.parse(e.data);
+        const data = parseSseData(e);
+        if (!data) return;
         if (data.session) {
           setSession(data.session);
-          setPlan(data.session.plan || []);
+          setPlan(Array.isArray(data.session.plan) ? data.session.plan : []);
         }
-        if (data.toolLogs) setToolLogs(data.toolLogs);
+        if (Array.isArray(data.toolLogs)) setToolLogs(data.toolLogs);
       });
 
       es.addEventListener('step_update', (e) => {
-        const data = JSON.parse(e.data);
-        setSession((prev) => (prev ? { ...prev, steps: data.steps, status: data.status } : prev));
-        if (data.plan) setPlan(data.plan);
+        const data = parseSseData(e);
+        if (!data) return;
+        setSession((prev) =>
+          prev ? { ...prev, steps: Array.isArray(data.steps) ? data.steps : prev.steps, status: data.status } : prev
+        );
+        if (Array.isArray(data.plan)) setPlan(data.plan);
       });
 
       es.addEventListener('tool_started', (e) => {
-        const log = JSON.parse(e.data);
+        const log = parseSseData(e);
+        if (!log) return;
         setToolLogs((prev) => {
           const exists = prev.some((item) => (item._id || item.logId) === log.logId);
           return exists ? prev : [...prev, log];
@@ -134,7 +147,8 @@ export function ResearchWorkspacePage() {
       });
 
       const upsertToolLog = (e) => {
-        const log = JSON.parse(e.data);
+        const log = parseSseData(e);
+        if (!log) return;
         setToolLogs((prev) => {
           const idx = prev.findIndex((item) => (item._id || item.logId) === log.logId);
           if (idx === -1) return [...prev, log];
@@ -148,14 +162,16 @@ export function ResearchWorkspacePage() {
       es.addEventListener('tool_failed', upsertToolLog);
 
       es.addEventListener('approval_required', (e) => {
-        const data = JSON.parse(e.data);
+        const data = parseSseData(e);
+        if (!data) return;
         setSession((prev) =>
           prev ? { ...prev, status: 'awaiting_approval', pendingApproval: data.pendingApproval } : prev
         );
       });
 
       es.addEventListener('status_change', (e) => {
-        const data = JSON.parse(e.data);
+        const data = parseSseData(e);
+        if (!data) return;
         setSession((prev) => (prev ? { ...prev, status: data.status } : prev));
         if (['completed', 'failed', 'cancelled'].includes(data.status)) {
           refreshSession(id);
@@ -164,10 +180,10 @@ export function ResearchWorkspacePage() {
       });
 
       es.addEventListener('report_ready', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.session) {
+        const data = parseSseData(e);
+        if (data?.session) {
           setSession(data.session);
-          setPlan(data.session.plan || []);
+          setPlan(Array.isArray(data.session.plan) ? data.session.plan : []);
         }
         refreshSession(id);
         stopStreams();
@@ -179,8 +195,8 @@ export function ResearchWorkspacePage() {
       });
 
       es.addEventListener('error_event', (e) => {
-        const data = JSON.parse(e.data);
-        setWorkspaceError(data.error || 'Research execution failed.');
+        const data = parseSseData(e);
+        setWorkspaceError(data?.error || 'Research execution failed.');
         refreshSession(id);
         stopStreams();
       });
@@ -199,7 +215,7 @@ export function ResearchWorkspacePage() {
   useEffect(() => {
     documentService
       .list()
-      .then(setDocuments)
+      .then((list) => setDocuments(Array.isArray(list) ? list : []))
       .catch(() => {});
     adminService
       .getHealth()

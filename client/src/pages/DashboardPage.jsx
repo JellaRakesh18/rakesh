@@ -47,10 +47,18 @@ export function DashboardPage() {
     setError('');
     try {
       const data = await researchService.getHistory(query ? { search: query } : {});
-      setSessions(data.sessions || []);
-      if (data.stats) setStats(data.stats);
+      const list = Array.isArray(data?.sessions) ? data.sessions : [];
+      setSessions(list);
+      setStats({
+        totalSessions: data?.stats?.totalSessions ?? list.length,
+        completed: data?.stats?.completed ?? 0,
+        running: data?.stats?.running ?? 0,
+        failed: data?.stats?.failed ?? 0,
+        totalToolCalls: data?.stats?.totalToolCalls ?? 0,
+        totalDocuments: data?.stats?.totalDocuments ?? 0,
+      });
     } catch (err) {
-      setError(err.friendlyMessage || 'Failed to load dashboard.');
+      setError(err?.friendlyMessage || 'Failed to load dashboard.');
     } finally {
       setLoading(false);
     }
@@ -65,16 +73,20 @@ export function DashboardPage() {
     loadDashboard(search);
   };
 
-  const savedReports = sessions.filter((s) => s.status === 'completed' && s.report);
+  const safeSessions = Array.isArray(sessions) ? sessions : [];
+  const savedReports = safeSessions.filter((s) => s?.status === 'completed' && s?.report);
 
-  const chartData = sessions
+  const chartData = safeSessions
     .slice(0, 7)
     .reverse()
-    .map((s) => ({
-      name: (s.title || 'Session').slice(0, 14) + (s.title?.length > 14 ? '…' : ''),
-      tools: s.metrics?.totalToolCalls || 0,
-      sources: s.sources?.length || 0,
-    }));
+    .map((s) => {
+      const rawTitle = s?.title || s?.question || 'Session';
+      return {
+        name: rawTitle.slice(0, 14) + (rawTitle.length > 14 ? '…' : ''),
+        tools: s?.metrics?.totalToolCalls ?? 0,
+        sources: s?.sources?.length ?? 0,
+      };
+    });
 
   return (
     <AppLayout>
@@ -265,7 +277,7 @@ export function DashboardPage() {
                 </Link>
               </div>
 
-              {sessions.length === 0 ? (
+              {safeSessions.length === 0 ? (
                 <EmptyState
                   icon={Sparkles}
                   title="No research sessions yet"
@@ -281,29 +293,29 @@ export function DashboardPage() {
                 />
               ) : (
                 <div className="divide-y divide-slate-800/80">
-                  {sessions.slice(0, 6).map((s) => (
+                  {safeSessions.slice(0, 6).map((s) => (
                     <div
-                      key={s._id}
+                      key={s?._id}
                       className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge status={s.status} />
+                          <StatusBadge status={s?.status || 'planned'} />
                           <span className="text-[11px] font-mono uppercase text-slate-400">
-                            {s.depth}
+                            {s?.depth || 'standard'}
                           </span>
                           <span className="text-[11px] text-slate-500 inline-flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {new Date(s.createdAt).toLocaleDateString()}
+                            {s?.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'}
                           </span>
                         </div>
                         <p className="text-sm font-medium text-slate-100 mt-1 truncate">
-                          {s.title || s.question}
+                          {s?.title || s?.question || 'Untitled Session'}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Link
-                          to={s.status === 'completed' ? `/reports/${s._id}` : `/workspace?sessionId=${s._id}`}
+                          to={s?.status === 'completed' ? `/reports/${s?._id}` : `/workspace?sessionId=${s?._id}`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-violet-600/25 text-slate-200 hover:text-violet-200 border border-slate-700 hover:border-violet-500/40 text-xs font-medium transition-colors"
                         >
                           {s.status === 'completed' ? 'View Report' : 'Open Workspace'}
