@@ -19,7 +19,7 @@ export const env = {
       : 'dev_only_insecure_jwt_secret_change_in_env'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   tavilyApiKey: process.env.TAVILY_API_KEY || '',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   maxUploadSizeMb: toInt(process.env.MAX_UPLOAD_SIZE_MB, 10),
