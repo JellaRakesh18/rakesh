@@ -57,7 +57,7 @@ export function errorHandler(err, _req, res, _next) {
 
   const status = err.statusCode || 500;
   const message =
-    status >= 500 && process.env.NODE_ENV === 'production'
+    status >= 500 && process.env.NODE_ENV === 'production' && !err.exposeInProd
       ? 'An unexpected server error occurred.'
       : err.message || 'An unexpected server error occurred.';
 
